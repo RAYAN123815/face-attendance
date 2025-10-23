@@ -6,7 +6,7 @@ import pandas as pd
 import os
 from datetime import datetime
 
-st.set_page_config(page_title="Face Attendance System", layout="wide")
+st.set_page_config(page_title="Face Attendance", layout="wide")
 st.title("📸 Face Recognition Attendance (DeepFace)")
 
 KNOWN_FACES_DIR = "known_faces"
