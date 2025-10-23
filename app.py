@@ -1,94 +1,75 @@
 import streamlit as st
-import face_recognition
+from deepface import DeepFace
+import cv2
 import numpy as np
 import pandas as pd
-import cv2
-from datetime import datetime
 import os
+from datetime import datetime
 
 st.set_page_config(page_title="Face Attendance System", layout="wide")
-st.title("📸 Face Attendance System")
+st.title("📸 Face Recognition Attendance (DeepFace)")
 
-# Folders
-os.makedirs("registered_faces", exist_ok=True)
-os.makedirs("uploads", exist_ok=True)
+KNOWN_FACES_DIR = "known_faces"
+os.makedirs(KNOWN_FACES_DIR, exist_ok=True)
 
 ATTENDANCE_FILE = "attendance.csv"
-
-# Load existing encodings
-known_encodings = []
-known_names = []
-
-def load_registered_faces():
-    known_encodings.clear()
-    known_names.clear()
-    for name in os.listdir("registered_faces"):
-        path = os.path.join("registered_faces", name)
-        if os.path.isfile(path):
-            image = face_recognition.load_image_file(path)
-            encodings = face_recognition.face_encodings(image)
-            if encodings:
-                known_encodings.append(encodings[0])
-                known_names.append(os.path.splitext(name)[0])
-
-load_registered_faces()
-
-# Initialize CSV
 if not os.path.exists(ATTENDANCE_FILE):
     pd.DataFrame(columns=["Name", "Time"]).to_csv(ATTENDANCE_FILE, index=False)
 
-# --- Register new face ---
-st.header("🧍 Register New Face")
-with st.form("register_form"):
-    name = st.text_input("Enter Name")
-    img_file = st.file_uploader("Upload Face Image", type=["jpg", "jpeg", "png"])
-    submit_reg = st.form_submit_button("Register")
+def mark_attendance(name):
+    df = pd.read_csv(ATTENDANCE_FILE)
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    df.loc[len(df)] = [name, now]
+    df.to_csv(ATTENDANCE_FILE, index=False)
 
-    if submit_reg and name and img_file:
-        img_path = os.path.join("registered_faces", f"{name}.jpg")
-        with open(img_path, "wb") as f:
-            f.write(img_file.read())
-        st.success(f"{name} registered successfully ✅")
-        load_registered_faces()
+def load_known_faces():
+    paths = [os.path.join(KNOWN_FACES_DIR, f) for f in os.listdir(KNOWN_FACES_DIR)
+             if f.lower().endswith((".jpg", ".jpeg", ".png"))]
+    names = [os.path.splitext(os.path.basename(p))[0] for p in paths]
+    return paths, names
 
-# --- Recognize faces ---
-st.header("🔍 Recognize Faces for Attendance")
-recog_file = st.file_uploader("Upload Image for Attendance", type=["jpg", "jpeg", "png"])
+st.sidebar.header("🧠 Menu")
+mode = st.sidebar.radio("Choose mode:", ["Register", "Recognize", "View Attendance"])
 
-if recog_file:
-    image_path = os.path.join("uploads", recog_file.name)
-    with open(image_path, "wb") as f:
-        f.write(recog_file.read())
+if mode == "Register":
+    st.subheader("🧍 Register a New Face")
+    name = st.text_input("Enter Name:")
+    file = st.file_uploader("Upload Face Image", type=["jpg", "jpeg", "png"])
+    if st.button("Register"):
+        if not name or not file:
+            st.warning("Please provide both name and image.")
+        else:
+            img_path = os.path.join(KNOWN_FACES_DIR, f"{name}.jpg")
+            with open(img_path, "wb") as f:
+                f.write(file.read())
+            st.success(f"✅ {name} registered successfully!")
 
-    image = face_recognition.load_image_file(image_path)
-    face_locations = face_recognition.face_locations(image)
-    face_encodings = face_recognition.face_encodings(image, face_locations)
-    image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+elif mode == "Recognize":
+    st.subheader("🔍 Recognize and Mark Attendance")
+    file = st.file_uploader("Upload image for recognition", type=["jpg", "jpeg", "png"])
+    if file:
+        img = cv2.imdecode(np.frombuffer(file.read(), np.uint8), 1)
+        st.image(img, channels="BGR", caption="Uploaded Image")
 
-    attendance = pd.read_csv(ATTENDANCE_FILE)
-    found_names = []
+        known_paths, known_names = load_known_faces()
+        match_found = None
 
-    for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
-        matches = face_recognition.compare_faces(known_encodings, face_encoding)
-        name = "Unknown"
+        for path, name in zip(known_paths, known_names):
+            try:
+                result = DeepFace.verify(img, path, model_name="VGG-Face", enforce_detection=False)
+                if result["verified"]:
+                    match_found = name
+                    mark_attendance(name)
+                    break
+            except Exception:
+                continue
 
-        face_distances = face_recognition.face_distance(known_encodings, face_encoding)
-        if len(face_distances) > 0:
-            best_match_index = np.argmin(face_distances)
-            if matches[best_match_index]:
-                name = known_names[best_match_index]
+        if match_found:
+            st.success(f"✅ Recognized: {match_found}")
+        else:
+            st.error("❌ No match found")
 
-        found_names.append(name)
-        color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)
-        cv2.rectangle(image_bgr, (left, top), (right, bottom), color, 2)
-        cv2.putText(image_bgr, name, (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
-
-        if name != "Unknown":
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            if name not in attendance["Name"].values:
-                attendance.loc[len(attendance)] = [name, now]
-
-    attendance.to_csv(ATTENDANCE_FILE, index=False)
-    st.image(cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB), caption="Processed Image", use_container_width=True)
-    st.write("✅ Attendance Recorded for:", ", ".join(found_names))
-    st.dataframe(attendance)
+elif mode == "View Attendance":
+    st.subheader("📋 Attendance Records")
+    df = pd.read_csv(ATTENDANCE_FILE)
+    st.dataframe(df[::-1], use_container_width=True)
