@@ -1,9 +1,13 @@
-import streamlit as st
-from deepface import DeepFace
 import cv2
 import numpy as np
 import pandas as pd
 import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # suppress TensorFlow warnings
+os.environ["CUDA_VISIBLE_DEVICES"] = ""   # force CPU mode
+
+from deepface import DeepFace
+import streamlit as st
+
 from datetime import datetime
 
 st.set_page_config(page_title="Face Attendance", layout="wide")
