@@ -1,8 +1,8 @@
 try:
     import cv2
-except ImportError:
+except Exception as e:
     import streamlit as st
-    st.error("⚠️ OpenCV failed to load. Please check your Streamlit environment.")
+    st.error("⚠️ OpenCV failed to load: " + str(e))
 
 import numpy as np
 import pandas as pd
