@@ -65,35 +65,24 @@ if mode == "Recognize Faces":
     st.subheader("🟢 Real-Time Recognition")
     run = st.checkbox("Start Camera")
 
-    if run:
-        camera = cv2.VideoCapture(0)
-    if not camera.isOpened():
-        st.error("⚠️ Camera not accessible in this environment (like Streamlit Cloud). Try uploading an image instead.")
+    uploaded_file = st.file_uploader("📸 Upload a photo for recognition", type=["jpg", "jpeg", "png"])
+
+if uploaded_file is not None:
+    image = cv2.imdecode(np.frombuffer(uploaded_file.read(), np.uint8), 1)
+    st.image(image, channels="BGR", caption="Uploaded Image")
+
+    matched_name = None
+    for known_path, name in zip(known_face_paths, known_face_names):
+        result = DeepFace.verify(image, known_path, model_name="VGG-Face", enforce_detection=False)
+        if result["verified"]:
+            matched_name = name
+            mark_attendance(name)
+            break
+
+    if matched_name:
+        st.success(f"✅ Recognized: {matched_name}")
     else:
-        attendance_set = set()
-        FRAME_WINDOW = st.image([])
-
-        while run:
-            ret, frame = camera.read()
-            if not ret:
-                st.warning("Camera not accessible.")
-                break
-
-            for known_path, name in zip(known_face_paths, known_face_names):
-                try:
-                    result = DeepFace.verify(frame, known_path, model_name="VGG-Face", enforce_detection=False)
-                    if result["verified"]:
-                        if name not in attendance_set:
-                            mark_attendance(name)
-                            attendance_set.add(name)
-                        cv2.putText(frame, name, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
-                        break
-                except Exception as e:
-                    pass
-
-            FRAME_WINDOW.image(frame, channels="BGR")
-
-        camera.release()
+        st.error("❌ No match found.")
 
     # Optional upload fallback for Streamlit Cloud
     uploaded_file = st.file_uploader("Or upload an image for recognition", type=["jpg", "jpeg", "png"])
