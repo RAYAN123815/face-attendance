@@ -1,8 +1,7 @@
 streamlit
-opencv-python-headless
-deepface
-tensorflow
-keras
+opencv-python-headless==4.10.0.84
+deepface==0.0.79
+tensorflow==2.15.0
+keras==2.15.0
 numpy
 pandas
-
