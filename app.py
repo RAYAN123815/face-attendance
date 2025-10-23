@@ -96,4 +96,18 @@ if mode == "Recognize Faces":
 elif mode == "Register New Face":
     st.subheader("📷 Register a New Face")
     new_name = st.text_input("Enter Name:")
-    if st.button("Capt
+    if st.button("Capture Face"):
+        if new_name.strip() == "":
+            st.warning("Please enter a valid name first.")
+        else:
+            register_new_face(new_name)
+            st.success(f"Face for {new_name} registered successfully. Restart app to refresh database.")
+
+# -------------------- MODE 3: ATTENDANCE TABLE --------------------
+elif mode == "View Attendance":
+    st.subheader("📄 Attendance Records")
+    if os.path.exists(ATTENDANCE_FILE):
+        df = pd.read_csv(ATTENDANCE_FILE)
+        st.dataframe(df[::-1], use_container_width=True)
+    else:
+        st.info("No attendance records found yet.")
