@@ -67,8 +67,11 @@ if mode == "Recognize Faces":
 
     if run:
         camera = cv2.VideoCapture(0)
-        FRAME_WINDOW = st.image([])
+    if not camera.isOpened():
+        st.error("⚠️ Camera not accessible in this environment (like Streamlit Cloud). Try uploading an image instead.")
+    else:
         attendance_set = set()
+        FRAME_WINDOW = st.image([])
 
         while run:
             ret, frame = camera.read()
@@ -91,6 +94,26 @@ if mode == "Recognize Faces":
             FRAME_WINDOW.image(frame, channels="BGR")
 
         camera.release()
+
+    # Optional upload fallback for Streamlit Cloud
+    uploaded_file = st.file_uploader("Or upload an image for recognition", type=["jpg", "jpeg", "png"])
+    if uploaded_file is not None:
+        file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
+        frame = cv2.imdecode(file_bytes, 1)
+        detected = False
+        for known_path, name in zip(known_face_paths, known_face_names):
+            try:
+                result = DeepFace.verify(frame, known_path, model_name="VGG-Face", enforce_detection=False)
+                if result["verified"]:
+                    mark_attendance(name)
+                    st.success(f"✅ Recognized: {name}")
+                    detected = True
+                    break
+            except Exception:
+                pass
+        if not detected:
+            st.warning("No known face detected in uploaded image.")
+
 
 # -------------------- MODE 2: REGISTER NEW FACE --------------------
 elif mode == "Register New Face":
