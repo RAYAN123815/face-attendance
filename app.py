@@ -42,7 +42,7 @@ def compare_images(img1, img2, threshold=8):
 
 # ---------------- Streamlit UI ----------------
 st.set_page_config(page_title="Attendance System", layout="wide")
-st.title("Face Verification Attendance")
+st.title("Face Attendance System")
 
 menu = st.sidebar.radio("Menu", ["Register", "Mark Attendance", "View Records", "Delete Records"])
 
